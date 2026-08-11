@@ -1,0 +1,17 @@
+logs/*
+!logs/.gitkeep
+
+external/*
+!external/.gitkeep
+
+custom/*
+!custom/.gitkeep
+!custom/CustomScript.example.ps1
+
+dist/
+*.zip
+
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
