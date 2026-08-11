@@ -7,7 +7,7 @@ It can install selected apps with WinGet, detect already installed software, run
 ## Download And Run
 
 ```powershell
-iwr https://github.com/NathanNT/Windows-Setup-Forge/archive/refs/heads/main.zip -OutFile setup.zip; Expand-Archive setup.zip setup -Force; cd setup\Windows-Setup-Forge-main; .\Start-Setup.bat
+$d="$env:TEMP\SetupForge"; rm $d -Recurse -Force -ea 0; mkdir $d|out-null; iwr https://github.com/NathanNT/Windows-Setup-Forge/archive/refs/heads/main.zip -OutFile "$d\setup.zip"; Expand-Archive "$d\setup.zip" $d -Force; cd "$d\Windows-Setup-Forge-main"; .\Start-Setup.bat
 ```
 
 ## Launch
