@@ -36,6 +36,7 @@ You can also double-click `Start-Setup.bat`.
 ## Custom Script
 
 `custom\CustomScript.ps1` is local-only and ignored by git.
+Its console output is captured in `logs\custom-script-*.log` and replayed in the app logs after execution.
 
 Use the example if needed:
 

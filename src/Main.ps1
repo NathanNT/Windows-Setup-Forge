@@ -555,19 +555,13 @@ function Start-Installation {
     $needsAdmin = @($selectedApps | Where-Object { $_.RequiresAdmin })
     if ($needsAdmin.Count -gt 0 -and -not $script:IsAdministrator) {
         $answer = [Windows.MessageBox]::Show(
-            "Some selected applications may require administrator privileges. Restart Windows Setup Manager as administrator now?`n`nYes: restart as admin`nNo: continue in this session`nCancel: do not start",
+            "Some selected applications may require administrator privileges and could fail in a standard session.`n`nUse the 'Restart as admin' button at the top if you want elevation before installing.`n`nContinue in the current session?",
             'Administrator privileges',
-            'YesNoCancel',
+            'OKCancel',
             'Warning'
         )
 
-        if ($answer -eq [Windows.MessageBoxResult]::Yes) {
-            Restart-AsAdministrator -ScriptPath $script:EntryPoint
-            $script:Window.Close()
-            return
-        }
-
-        if ($answer -eq [Windows.MessageBoxResult]::Cancel) {
+        if ($answer -ne [Windows.MessageBoxResult]::OK) {
             return
         }
     }

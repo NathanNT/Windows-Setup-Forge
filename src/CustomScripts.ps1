@@ -60,6 +60,61 @@ function Assert-CustomScriptPath {
     $resolvedScript
 }
 
+function New-CustomScriptRunnerContent {
+    [CmdletBinding()]
+    param()
+
+@'
+#requires -Version 5.1
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory)]
+    [string]$ScriptPath,
+
+    [Parameter(Mandatory)]
+    [string]$OutputLog
+)
+
+$ErrorActionPreference = 'Continue'
+$exitCode = 0
+
+try {
+    $logDirectory = Split-Path -Parent $OutputLog
+    if (-not (Test-Path -LiteralPath $logDirectory)) {
+        [void](New-Item -Path $logDirectory -ItemType Directory -Force)
+    }
+
+    "==== SetupForge custom script started: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') ====" | Out-File -LiteralPath $OutputLog -Encoding UTF8 -Force
+    "Script: $ScriptPath" | Out-File -LiteralPath $OutputLog -Encoding UTF8 -Append
+    "" | Out-File -LiteralPath $OutputLog -Encoding UTF8 -Append
+
+    & $ScriptPath *>&1 | ForEach-Object {
+        $text = ($_ | Out-String).TrimEnd()
+        if (-not [string]::IsNullOrEmpty($text)) {
+            $text | Out-File -LiteralPath $OutputLog -Encoding UTF8 -Append
+            Write-Output $text
+        }
+    }
+
+    if ($global:LASTEXITCODE -is [int]) {
+        $exitCode = $global:LASTEXITCODE
+    }
+}
+catch {
+    $exitCode = 1
+    $message = "ERROR: $($_.Exception.Message)"
+    $message | Out-File -LiteralPath $OutputLog -Encoding UTF8 -Append
+    Write-Output $message
+}
+finally {
+    "" | Out-File -LiteralPath $OutputLog -Encoding UTF8 -Append
+    "==== SetupForge custom script finished: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') | ExitCode: $exitCode ====" | Out-File -LiteralPath $OutputLog -Encoding UTF8 -Append
+}
+
+exit $exitCode
+'@
+}
+
 function Invoke-CustomScript {
     [CmdletBinding()]
     param(
@@ -89,15 +144,30 @@ function Invoke-CustomScript {
         'powershell.exe'
     }
 
+    $logDirectory = Join-Path $ProjectRoot 'logs'
+    if (-not (Test-Path -LiteralPath $logDirectory)) {
+        [void](New-Item -Path $logDirectory -ItemType Directory -Force)
+    }
+
+    $outputLog = Join-Path $logDirectory ('custom-script-{0}.log' -f (Get-Date -Format 'yyyy-MM-dd-HHmmss'))
+    $runnerPath = Join-Path ([System.IO.Path]::GetTempPath()) ('SetupForge-CustomScript-{0}.ps1' -f ([Guid]::NewGuid().ToString('N')))
+    $encoding = New-Object System.Text.UTF8Encoding $true
+    [System.IO.File]::WriteAllText($runnerPath, (New-CustomScriptRunnerContent), $encoding)
+
     $arguments = @(
         '-NoProfile',
         '-ExecutionPolicy',
         'Bypass',
         '-File',
-        "`"$scriptPath`""
+        "`"$runnerPath`"",
+        '-ScriptPath',
+        "`"$scriptPath`"",
+        '-OutputLog',
+        "`"$outputLog`""
     )
 
     Write-CustomScriptLog -LogCallback $LogCallback -Level 'INFO' -Message "Running custom script: $scriptPath"
+    Write-CustomScriptLog -LogCallback $LogCallback -Level 'INFO' -Message "Custom script output log: $outputLog"
 
     $startParameters = @{
         FilePath     = $powerShellPath
@@ -111,8 +181,28 @@ function Invoke-CustomScript {
         Write-CustomScriptLog -LogCallback $LogCallback -Level 'INFO' -Message 'Custom script will request administrator privileges.'
     }
 
-    $process = Start-Process @startParameters
-    $exitCode = if ($null -ne $process) { $process.ExitCode } else { $null }
+    try {
+        $process = Start-Process @startParameters
+        $exitCode = if ($null -ne $process) { $process.ExitCode } else { $null }
+    }
+    finally {
+        if (Test-Path -LiteralPath $runnerPath) {
+            Remove-Item -LiteralPath $runnerPath -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    if (Test-Path -LiteralPath $outputLog) {
+        $outputLines = @(Get-Content -LiteralPath $outputLog -Encoding UTF8 -ErrorAction SilentlyContinue)
+        foreach ($line in $outputLines) {
+            if (-not [string]::IsNullOrWhiteSpace($line)) {
+                Write-CustomScriptLog -LogCallback $LogCallback -Level 'CUSTOM' -Message $line
+            }
+        }
+    }
+    else {
+        Write-CustomScriptLog -LogCallback $LogCallback -Level 'WARN' -Message 'Custom script output log was not created.'
+    }
+
     $success = ($null -eq $exitCode -or $exitCode -eq 0)
     $message = if ($success) {
         'Custom script completed successfully.'
@@ -128,5 +218,6 @@ function Invoke-CustomScript {
         ExitCode   = $exitCode
         Message    = $message
         ScriptPath = $scriptPath
+        OutputLog  = $outputLog
     }
 }
