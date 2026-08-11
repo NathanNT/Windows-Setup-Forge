@@ -4,6 +4,12 @@ SetupForge is a small PowerShell/WPF app for preparing fresh Windows 10/11 machi
 
 It can install selected apps with WinGet, detect already installed software, run VM deployment helpers, launch Win11Debloat after confirmation, and execute a local custom post-setup script.
 
+## Download And Run
+
+```powershell
+iwr https://github.com/NathanNT/Windows-Setup-Forge/archive/refs/heads/main.zip -OutFile setup.zip; Expand-Archive setup.zip setup -Force; cd setup\Windows-Setup-Forge-main; .\Start-Setup.bat
+```
+
 ## Launch
 
 ```powershell
